@@ -6,16 +6,12 @@ class Barber(mesa.Agent):
 
     def __init__(self, unique_id, model, customer=None):
         super().__init__(unique_id, model)
-
         # Create the Barber's current_hair_cut_length variable and set the initial values.
-        # self.current_hair_cut_length = random.randint(20,40)
         self.current_hair_cut_length = 0
         self.my_customer = customer
 
     def step(self):
         # Who's hair is the barber cutting:
-
-        # For demonstration purposes I'll print the agent's unique_id
         print(
             f"Barber {str(self.unique_id)}, hair cut left: {str(self.current_hair_cut_length)}")
         if self.my_customer is not None:
