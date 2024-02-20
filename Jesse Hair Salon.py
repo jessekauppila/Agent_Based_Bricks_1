@@ -74,6 +74,12 @@ class Barbesrhop_Model(mesa.Model):
 
     def __init__(self, num_Barber):
         super().__init__()
+        self.start_time = "09:00"
+        hours, minutes = map(int, self.start_time.split(':'))
+
+        self.start_time_hours = hours
+        self.start_time_minutes = minutes
+        print(f"[{str(self.start_time)}] Jesse Boardman's Barbering is open for business.")
         self.schedule = mesa.time.RandomActivation(self)
         self.time = 0
         self.customer_count = 0
