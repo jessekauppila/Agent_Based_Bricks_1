@@ -71,6 +71,8 @@ class BarbershopModel(mesa.Model):
         self.num_in_waiting_room = 0  # Initialize the waiting room size counter
         self.customer_count = 0
 
+
+
     def step(self):
         #self.schedule_agents()  # Schedule new customers
         self.execute_barber_actions()  # Execute barber actions
