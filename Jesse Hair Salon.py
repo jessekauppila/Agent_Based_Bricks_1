@@ -5,19 +5,21 @@ import random
 class Barber(mesa.Agent):
     """An agent with availability or not"""
 
-    def __init__(self, unique_id, model, customer=None):
+    def __init__(self, unique_id, model, customer=None, time_on_shift=0):
         super().__init__(unique_id, model)
         # Create the Barber's current_hair_cut_length variable and set the initial values.
         self.current_hair_cut_length = 0
         self.my_customer = customer
+        self.time_on_shift = time_on_shift
+        self.on_shift = True
 
     def step(self):
         # Who's hair is the barber cutting:
 
-        if self.my_customer is not None:
-            print(
-                f"Barber {str(self.unique_id)}, hair cut left: {str(self.current_hair_cut_length)}")
-            print(f" Cutting customer: {str(self.my_customer)}")
+        # if self.my_customer is not None:
+            # print(
+            #     f"Barber {str(self.unique_id)}, hair cut left: {str(self.current_hair_cut_length)}")
+            # print(f" Cutting customer: {str(self.my_customer)}")
         # else:
         #     print (f"Barber {str(self.unique_id)} available!")
 
@@ -45,11 +47,11 @@ class Customer(mesa.Agent):
     def mark_as_waiting(self):
         if self.marked_as_getting_haircut:
             self.marked_as_waiting = False
-            print(
-                f"Customer {str(self.unique_id)} getting cut for {str(self.current_hair_cut_length)} minutes with Barber {str(self.my_barber)}.")
+            # print(
+                # f"Customer {str(self.unique_id)} getting cut for {str(self.current_hair_cut_length)} minutes with Barber {str(self.my_barber)}.")
     def customer_leaves(self):
-        if self.marked_as_waiting is True:
-            print(f"Customer {str(self.unique_id)} waited {str(self.time_waiting)} minutes.")
+        # if self.marked_as_waiting is True:
+            #print(f"Customer {str(self.unique_id)} waited {str(self.time_waiting)} minutes.")
         if self.time_waiting > 5 and self.marked_as_waiting is True:
             print(f"Customer {str(self.unique_id)} ANGRY, leaves and removed.")
             self.marked_as_left_angry = True
@@ -75,37 +77,40 @@ class Barbesrhop_Model(mesa.Model):
         self.schedule = mesa.time.RandomActivation(self)
         self.time = 0
         self.customer_count = 0
+        self.longest_waiting_customer_num = 1  # Initialize the longest waiting customer and their waiting time
+        self.longest_waiting_time = 0
+        self.num_in_waiting_room = 0  # Initialize the waiting room size counter
+        self.max_num_in_waiting_room = 8
+        self.length_of_shift = 10
 
         # Create Barber
         self.num_Barber = num_Barber
         for i in range(self.num_Barber):
-            a = Barber(i, self, None)
+            a = Barber(i+1, self, None, 0)
             # Add the agent to the scheduler
             self.schedule.add(a)
-
-        # Initialize the longest waiting customer and their waiting time
-        self.longest_waiting_customer_num = 1
-        self.longest_waiting_time = 0
 
     def step(self):
         """Advance the model by one step."""
         self.create_customer()
         self.assign_customer_to_barber()
         self.find_longest_waiting_customer()
+        self.waiting_room()  # Print waiting room size
+        self.barber_signs_out() # Barber signs out after working too long
+        self.new_barber_signs_in() # New barber signs in
+        self.iterate_barbers_time_on_shift()
         self.time += 1  # Increment time
-
         self.schedule.step()
 
     def find_longest_waiting_customer(self):
-
         # Find the customer with the longest waiting time
         for agent in self.schedule.agents:
             if isinstance(agent,
                           Customer) and agent.time_waiting > self.longest_waiting_time and agent.marked_as_waiting is True:
                 self.longest_waiting_customer_num = agent.unique_id
                 self.longest_waiting_time = agent.time_waiting
-                print(
-                    f"Longest waiting customer {self.longest_waiting_customer_num} with {self.longest_waiting_time} minutes wait.")
+                # print(
+                #     f"Longest waiting customer {self.longest_waiting_customer_num} with {self.longest_waiting_time} minutes wait.")
 
     def assign_customer_to_barber(self):
         # Assign the longest waiting customer to a barber
@@ -125,12 +130,40 @@ class Barbesrhop_Model(mesa.Model):
                         customer_longest_waiting.marked_as_getting_haircut = True
                         customer_longest_waiting.my_barber = agent.unique_id
                         break
+
+    def iterate_barbers_time_on_shift(self):
+        for agent in self.schedule.agents:
+            if isinstance(agent, Barber) and agent.on_shift == True:
+                agent.time_on_shift += 1
+                print(f"Barber {agent.unique_id} has been working for {agent.time_on_shift} minutes")
+
+    def barber_signs_out(self):
+        for agent in self.schedule.agents:
+            if isinstance(agent, Barber) and agent.my_customer is None and  agent.time_on_shift > self.length_of_shift:
+                agent.on_shift = False
+                print(f"Barber {agent.unique_id} signs out and removed")
+
+    def new_barber_signs_in(self):
+        for agent in self.schedule.agents:
+            if isinstance(agent, Barber) and agent.on_shift == False:
+                agent.remove()
+                self.num_Barber += 1
+                new_barber = Barber(self.num_Barber, self, None, 0)
+                # Add the agent to the scheduler
+                self.schedule.add(new_barber)
+                print(f"Barber {self.num_Barber} signs in")
+
     def create_customer(self):
-        if self.time % 3 == 0:
-            customer = Customer(self.customer_count, self)  # Create a new customer with a unique ID
+        if self.time % 3 == 0 and self.num_in_waiting_room < self.max_num_in_waiting_room:
+            customer = Customer(self.customer_count + 1, self)  # Create a new customer with a unique ID
             self.customer_count += 1  # Increment the customer count for the next customer
             self.schedule.add(customer)  # Add the customer to the scheduler
+        # elif self.time % 3 == 0 and self.num_in_waiting_room >= self.max_num_in_waiting_room:
+            # print(f"No more customers can get in waiting room")
 
+    def waiting_room(self):
+        self.num_in_waiting_room = sum(1 for agent in self.schedule.agents if isinstance(agent, Customer) and agent.marked_as_waiting)
+        # print(f"Waiting room size: {self.num_in_waiting_room}.")
 
 model = Barbesrhop_Model(1)
 for i in range(20):
