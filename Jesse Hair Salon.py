@@ -7,7 +7,6 @@ class Barber(mesa.Agent):
 
     def __init__(self, unique_id, model, customer=None, time_on_shift=0):
         super().__init__(unique_id, model)
-        # Create the Barber's current_hair_cut_length variable and set the initial values.
         self.current_hair_cut_length = 0
         self.my_customer = customer
         self.time_on_shift = time_on_shift
@@ -15,7 +14,6 @@ class Barber(mesa.Agent):
 
     def step(self):
         # Who's hair is the barber cutting:
-
         # if self.my_customer is not None:
             # print(
             #     f"Barber {str(self.unique_id)}, hair cut left: {str(self.current_hair_cut_length)}")
@@ -39,16 +37,17 @@ class Customer(mesa.Agent):
         self.my_barber = None
 
     def step(self):
-
         self.mark_as_waiting()
         self.customer_leaves()
         self.finishing_haircut()
         self.time_waiting += 1
+
     def mark_as_waiting(self):
         if self.marked_as_getting_haircut:
             self.marked_as_waiting = False
             # print(
                 # f"Customer {str(self.unique_id)} getting cut for {str(self.current_hair_cut_length)} minutes with Barber {str(self.my_barber)}.")
+
     def customer_leaves(self):
         # if self.marked_as_waiting is True:
             #print(f"Customer {str(self.unique_id)} waited {str(self.time_waiting)} minutes.")
@@ -61,8 +60,8 @@ class Customer(mesa.Agent):
         if self.current_hair_cut_length == 0 and self.marked_as_getting_haircut == True:
             self.marked_as_finished_haircut = True
             self.remove()
-
-            print(f"Customer {str(self.unique_id)} FINISHED with Barber {str(self.my_barber)} and removed")
+            print(f"[{str(model.convert_to_hh_mm(model.clock_time))}] Barber {str(self.my_barber)} finished cutting customer {str(self.unique_id)}")
+            print(f"[{str(model.convert_to_hh_mm(model.clock_time))}] Customer {str(self.unique_id)} leaves satisfied")
             for agent in self.model.schedule.agents:
                 if isinstance(agent, Barber) and agent.my_customer == self.unique_id:
                     agent.my_customer = None
@@ -72,21 +71,26 @@ class Customer(mesa.Agent):
 class Barbesrhop_Model(mesa.Model):
     """A model with some number of agents."""
 
+    @staticmethod
+    def convert_to_hh_mm(total_minutes):
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+        return f"{hours:02d}:{minutes:02d}"
+
     def __init__(self, num_Barber):
         super().__init__()
         self.start_time = "09:00"
         hours, minutes = map(int, self.start_time.split(':'))
+        self.clock_time = hours * 60 + minutes
+        print(f"[{str(self.convert_to_hh_mm(self.clock_time))}] Jesse Boardman's Barbering is open for business.")
 
-        self.start_time_hours = hours
-        self.start_time_minutes = minutes
-        print(f"[{str(self.start_time)}] Jesse Boardman's Barbering is open for business.")
         self.schedule = mesa.time.RandomActivation(self)
         self.time = 0
         self.customer_count = 0
         self.longest_waiting_customer_num = 1  # Initialize the longest waiting customer and their waiting time
         self.longest_waiting_time = 0
         self.num_in_waiting_room = 0  # Initialize the waiting room size counter
-        self.max_num_in_waiting_room = 8
+        self.max_num_in_waiting_room = 1
         self.length_of_shift = 10
 
         # Create Barber
@@ -95,6 +99,8 @@ class Barbesrhop_Model(mesa.Model):
             a = Barber(i+1, self, None, 0)
             # Add the agent to the scheduler
             self.schedule.add(a)
+            print(f"[{str(self.convert_to_hh_mm(self.clock_time))}] Barber {i+1} started shift")
+
 
     def step(self):
         """Advance the model by one step."""
@@ -106,6 +112,7 @@ class Barbesrhop_Model(mesa.Model):
         self.new_barber_signs_in() # New barber signs in
         self.iterate_barbers_time_on_shift()
         self.time += 1  # Increment time
+        self.clock_time += 1 #Increment clock time
         self.schedule.step()
 
     def find_longest_waiting_customer(self):
@@ -128,7 +135,7 @@ class Barbesrhop_Model(mesa.Model):
                                    Customer) and customer_longest_waiting.unique_id == self.longest_waiting_customer_num
                             and customer_longest_waiting.marked_as_waiting):
                         agent.my_customer = self.longest_waiting_customer_num
-                        print(f" Customer {agent.my_customer} assigned to Barber {agent.unique_id}")
+                        print(f"[{str(self.convert_to_hh_mm(self.clock_time))}] Barber {agent.unique_id} started cutting customer {agent.my_customer}'s hair.")
                         starting_hair_cut_length = 2  # create length of time of haircut
                         agent.current_hair_cut_length = starting_hair_cut_length
                         customer_longest_waiting.current_hair_cut_length = starting_hair_cut_length
@@ -141,13 +148,13 @@ class Barbesrhop_Model(mesa.Model):
         for agent in self.schedule.agents:
             if isinstance(agent, Barber) and agent.on_shift == True:
                 agent.time_on_shift += 1
-                print(f"Barber {agent.unique_id} has been working for {agent.time_on_shift} minutes")
+                #print(f"Barber {agent.unique_id} has been working for {agent.time_on_shift} minutes")
 
     def barber_signs_out(self):
         for agent in self.schedule.agents:
             if isinstance(agent, Barber) and agent.my_customer is None and  agent.time_on_shift > self.length_of_shift:
                 agent.on_shift = False
-                print(f"Barber {agent.unique_id} signs out and removed")
+                print(f"[{str(self.convert_to_hh_mm(self.clock_time))}] Barber {agent.unique_id} ended shift")
 
     def new_barber_signs_in(self):
         for agent in self.schedule.agents:
@@ -157,15 +164,20 @@ class Barbesrhop_Model(mesa.Model):
                 new_barber = Barber(self.num_Barber, self, None, 0)
                 # Add the agent to the scheduler
                 self.schedule.add(new_barber)
-                print(f"Barber {self.num_Barber} signs in")
+                print(f"[{str(self.convert_to_hh_mm(self.clock_time))}] Barber {self.num_Barber} started shift")
 
     def create_customer(self):
-        if self.time % 3 == 0 and self.num_in_waiting_room < self.max_num_in_waiting_room:
-            customer = Customer(self.customer_count + 1, self)  # Create a new customer with a unique ID
-            self.customer_count += 1  # Increment the customer count for the next customer
-            self.schedule.add(customer)  # Add the customer to the scheduler
-        # elif self.time % 3 == 0 and self.num_in_waiting_room >= self.max_num_in_waiting_room:
-            # print(f"No more customers can get in waiting room")
+        if self.time % 3 == 0:
+            if self.num_in_waiting_room < self.max_num_in_waiting_room:
+                customer = Customer(self.customer_count + 1, self)  # Create a new customer with a unique ID
+                self.customer_count += 1  # Increment the customer count for the next customer
+                self.schedule.add(customer)
+                print(f"[{self.convert_to_hh_mm(self.clock_time)}] Customer {self.customer_count} enters ")
+            else:
+                # customer = Customer(self.customer_count + 1, self)  # Create a new customer with a unique ID
+                self.customer_count += 1  # Increment the customer count for the next customer
+                #self.schedule.add(customer)
+                print(f"[{self.convert_to_hh_mm(self.clock_time)}] Customer {self.customer_count} leaves unfulfilled ")
 
     def waiting_room(self):
         self.num_in_waiting_room = sum(1 for agent in self.schedule.agents if isinstance(agent, Customer) and agent.marked_as_waiting)
